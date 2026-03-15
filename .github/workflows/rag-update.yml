@@ -1,0 +1,56 @@
+name: Auto-Update RAG Vectors
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'rag_docs/**'
+      - 'scripts/ingest.js'
+
+jobs:
+  update-rag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Embeddings (Ingest)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node scripts/ingest.js
+
+      - name: Update Cloudflare Vectorize
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "y" | npx wrangler vectorize delete jq-rag || true
+          npx wrangler vectorize create jq-rag --dimensions=1536 --metric=cosine
+          npx wrangler vectorize insert jq-rag --file devsecure-vectors.jsonl
+
+      - name: Send Email Notification on Failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp-relay.brevo.com
+          server_port: 587
+          username: ${{ secrets.BREVO_SMTP_LOGIN }}
+          password: ${{ secrets.BREVO_SMTP_PASSWORD }}
+          subject: "🚨 DevSecure RAG Update Failed"
+          to: devsecurelabs@gmail.com
+          from: DevSecure CI/CD <982d1a001@smtp-brevo.com>
+          body: |
+            The automated RAG ingestion pipeline failed on GitHub Actions.
+            Please check the repository's Actions tab for details.
+
+            Commit: ${{ github.sha }}
+            Run URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
