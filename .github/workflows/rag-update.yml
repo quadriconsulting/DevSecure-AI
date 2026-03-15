@@ -47,7 +47,7 @@ jobs:
           password: ${{ secrets.BREVO_SMTP_PASSWORD }}
           subject: "🚨 DevSecure RAG Update Failed"
           to: devsecurelabs@gmail.com
-          from: DevSecure CI/CD <982d1a001@smtp-brevo.com>
+          from: DevSecure CI/CD <research@devsecure.io>
           body: |
             The automated RAG ingestion pipeline failed on GitHub Actions.
             Please check the repository's Actions tab for details.
