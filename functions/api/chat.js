@@ -108,7 +108,7 @@ export async function onRequestPost({ request, env }) {
       console.log('[chat] KV write:', KV_HANDOFF, '=', uuid);
     }
     return Response.json({
-      reply: "I've alerted our support team. A real human will reply here in a moment!",
+      reply: "I've alerted our support team. A specialist will reply here in a moment!",
       action: "wait_for_agent",
       suggested: [],
     });

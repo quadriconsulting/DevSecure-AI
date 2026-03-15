@@ -512,7 +512,7 @@ const AIConcierge = ({ inline = false }: Props) => {
                                                 <div className="w-1.5 h-1.5 bg-[#F4E8D1] rounded-full animate-bounce" />
                                                 <div className="w-1.5 h-1.5 bg-[#F4E8D1] rounded-full animate-bounce [animation-delay:-.2s]" />
                                                 <div className="w-1.5 h-1.5 bg-[#F4E8D1] rounded-full animate-bounce [animation-delay:-.4s]" />
-                                                <span className="text-[11px] tracking-widest uppercase text-[#F4E8D1]/50 ml-1">Agent is responding...</span>
+                                                <span className="text-[11px] tracking-widest uppercase text-[#F4E8D1]/50 ml-1">A specialist is responding...</span>
                                             </div>
                                         )}
                                     </div>
