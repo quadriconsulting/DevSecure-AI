@@ -1,5 +1,5 @@
 // Author: Jeremy Quadri
-// functions/api/chat.js
+// functions/api/chat.js — DevSecure AI Concierge (B2B SaaS support agent)
 
 // Reply length policy
 // SOFT_CHAR_TARGET: model instruction target (best-effort)
@@ -44,7 +44,7 @@ export async function onRequestPost({ request, env }) {
     return Response.json({ reply: "Ask me a question and I'll help." }, { status: 400 });
   }
 
-  // --- TWO-WAY BRIDGE: forward user messages to Jeremy when session is live ---
+  // --- TWO-WAY BRIDGE: forward user messages to support agent when session is live ---
   if (env.CHAT_STATE && uuid) {
     const liveSession = await env.CHAT_STATE.get(KV_SESSION).catch(() => null);
     const handoffActive = await env.CHAT_STATE.get(KV_HANDOFF).catch(() => null);
@@ -68,7 +68,7 @@ export async function onRequestPost({ request, env }) {
       // Refresh timestamp so auto-timeout resets on each visitor message
       await env.CHAT_STATE.put(KV_SESSION_TS, Date.now().toString(), { expirationTtl: 86400 }).catch(() => {});
       console.log('[chat] TWO_WAY_BRIDGE forwarded to Telegram for session', uuid);
-      return Response.json({ reply: null, action: 'wait_for_jeremy', suggested: [] });
+      return Response.json({ reply: null, action: 'wait_for_agent', suggested: [] });
     }
   }
   // --- END TWO-WAY BRIDGE ---
@@ -109,8 +109,8 @@ export async function onRequestPost({ request, env }) {
       console.log('[chat] KV write:', KV_HANDOFF, '=', uuid);
     }
     return Response.json({
-      reply: "I've alerted Jeremy on Telegram. He'll reply here in a moment!",
-      action: "wait_for_jeremy",
+      reply: "I've alerted our support team. A real human will reply here in a moment!",
+      action: "wait_for_agent",
       suggested: [],
     });
   }
@@ -250,10 +250,10 @@ export async function onRequestPost({ request, env }) {
     });
   }
 
-  // 4) Ambiguous “about yourself” -> default professional unless explicitly personal
+  // 4) Ambiguous "about yourself" -> default professional
   if (ambiguousSelf && !wantPersonal) {
     return Response.json({
-      reply: "Do you mean Jeremy’s professional background or personal interests? (If you don’t specify, I’ll answer professionally.)",
+      reply: "I'm DevSecure's AI Concierge - I can help with AppSec questions, platform features, pricing, or booking a demo.",
       suggested: suggestFollowups(false),
     });
   }
@@ -269,17 +269,17 @@ export async function onRequestPost({ request, env }) {
     })
     .join("\n\n---\n\n");
 
-  // 6) System prompt — PROFESSIONAL FILTER MODE
+  // 6) System prompt — DEVSECURE B2B SAAS CONCIERGE
 const system = `
 LANGUAGE: Respond in English only, regardless of the language the user writes in.
 
 ROLE
-You are a professional assistant representing Jeremy Quadri's work, capabilities, projects, and operating principles.
+You are the DevSecure AI Concierge, a customer support and technical sales agent for an Application Security SaaS company. You do not represent an individual. Be professional, concise, and helpful.
 
-CONTEXTUAL ANCHORING (PROFESSIONAL FILTER)
+CONTEXTUAL ANCHORING
 - Answer using Retrieved Context as the primary source.
-- For broader questions, use general professional knowledge framed through Jeremy's approach.
-- Do NOT invent Jeremy-specific facts not supported by Retrieved Context.
+- For broader questions, use general AppSec knowledge framed through DevSecure's platform capabilities.
+- Do NOT invent DevSecure-specific facts not supported by Retrieved Context.
 
 OUT-OF-UNIVERSE — SCOPE PIVOT
 - If encyclopedic / world-fact Q&A, do NOT answer. Pivot with ONE short sentence, then offer list.
@@ -305,8 +305,8 @@ For example, I can help with:
 - Cover <topic>
 
 STRICT ACTION GATE
-- Do NOT return "action": "SHOW_CV" unless the user explicitly asks for a resume, CV, or document.
-- For technical or experience questions (SAST, DAST, Zero Trust, etc.), provide a text answer ONLY. No CV action.
+- Do NOT return "action": "SHOW_CV" under any circumstances.
+- For technical questions (SAST, DAST, Zero Trust, etc.), provide a text or diagram answer ONLY.
 
 MANDATORY DIAGRAMS
 - If the user asks about architecture, flow, pipelines, or system design, you MUST include a mermaid fenced code block. NO EXCEPTIONS. This takes priority over all brevity rules.
@@ -319,14 +319,13 @@ MANDATORY DIAGRAMS
 - The 60-word prose limit applies to descriptive text only, not the mermaid block.
 
 RESOURCE MAP (IMMUTABLE LINKS)
-- Calendar: https://calendar.app.google/R9rVquWQbqj8D26d6
-- LinkedIn: https://linkedin.com/in/jquadri
+- Book a Demo: https://devsecure.com/demo
 
 JSON OUTPUT CONTRACT
 - Respond with a valid JSON object.
 - Include a "reply" string.
 - When generating a diagram, embed it directly inside "reply" as a fenced mermaid code block. Escape all newlines as \n within the JSON string value.
-- "action": only use "SHOW_CV" if resume or CV is explicitly requested. Use "SHOW_CALENDAR" for booking/meeting requests. Use "RENDER_SVG" or "RENDER_CODE" only when directly asked.
+- "action": never use "SHOW_CV". Use "SHOW_CALENDAR" for booking/demo/meeting requests. Use "RENDER_SVG" or "RENDER_CODE" only when directly asked.
 `.trim();
 
     const user = `
@@ -336,7 +335,7 @@ ${message}
 Retrieved context:
 ${ctx || "(no matches returned)"}
 
-Answer using retrieved context as the primary source for Jeremy-specific questions. Do not use mechanical retrieval language.
+Answer using retrieved context as the primary source for DevSecure-specific questions. Do not use mechanical retrieval language.
 IMPORTANT: Be extremely brief. Answer in exactly ONE short sentence. If you include "For example, I can help with:", put it immediately after that sentence using literal hyphen bullets (- ).
 Respond with a valid JSON object containing at minimum a "reply" string.
 `.trim();
@@ -433,42 +432,29 @@ async function callOpenAI(apiKey, system, user, debugMode = false) {
   }
 }
 
-function isExplicitPersonalIntent(q) {
-  const s = q.toLowerCase();
-  const keywords = [
-    "hobby", "hobbies", "outside work", "personal", "free time",
-    "food", "drink", "cocktail", "restaurant", "cigar",
-    "snowboard", "snowboarding", "motorcycle", "motorcycling",
-    "fitness", "gym", "favourite", "favorite",
-  ];
-  return keywords.some(k => s.includes(k));
+function isExplicitPersonalIntent(_q) {
+  // Personal intent detection not applicable for B2B SaaS context.
+  return false;
 }
 
 function isAmbiguousAboutSelf(msg) {
     const lower = msg.toLowerCase();
 
     // 1. Check if it contains general "about you" phrasing
-    const hasGenericPrompt = /(tell me about (you|jeremy|yourself)|who (are you|is jeremy))/.test(lower);
+    const hasGenericPrompt = /(tell me about (you|devsecure|yourself)|who (are you|is devsecure))/.test(lower);
 
     // 2. Check if it contains specific professional/technical keywords
-    const hasTechFocus = /(sast|dast|experience|work|background|security|appsec|zero trust|architecture|code|skills)/.test(lower);
+    const hasTechFocus = /(sast|dast|experience|work|background|security|appsec|zero trust|architecture|code|skills|pricing|demo)/.test(lower);
 
     // It is ONLY ambiguous if it asks a generic question AND doesn't mention technical topics
     return hasGenericPrompt && !hasTechFocus;
 }
 
-function suggestFollowups(wantPersonal) {
-  if (wantPersonal) {
-    return [
-      "What hobbies or sports do you enjoy?",
-      "What food and drink do you like?",
-      "What do you do outside of work?",
-    ];
-  }
+function suggestFollowups(_wantPersonal) {
   return [
-    "What AppSec areas are you strongest in?",
-    "Describe your SAST/auto-fix safety approach.",
-    "How do you build risk scoring from EPSS/CVSS/KEV?",
+    "How does the autonomous SAST auto-fix work?",
+    "What is the pricing for a team of 10?",
+    "Explain the Multi-Agent Debate architecture.",
   ];
 }
 
@@ -535,8 +521,8 @@ function extractOfferLines(replyText) {
   // ── C) OFFER-ONLY VALIDATION (defined early for use in header check) ──────
   // C1  Explicit "I can …" with a content-bearing action verb
   const C1_RE = /\b(?:i can|i can help|i can help with)\b.{0,120}\b(?:explain|cover|discuss|walk(?: through)?|break down|outline|compare|summarize)\b/i;
-  // C2  "discuss Jeremy's experience with …"
-  const C2_RE = /\bdiscuss\b.{0,60}\bjeremy(?:'?s)?\b.{0,60}\bexperience\b.{0,60}\bwith\b/i;
+  // C2  "discuss DevSecure's capabilities with …"
+  const C2_RE = /\bdiscuss\b.{0,60}\bdevsecure(?:'?s)?\b.{0,60}\b(?:capabilities|features|experience)\b.{0,60}\bwith\b/i;
   // C3  Bullet prefixed with an offer verb (right after bullet marker)
   const C3_RE = /^[-\u2022*]\s*(?:explain|cover|walk(?: through)?|break down|outline|compare|summarize|discuss)\b/i;
 
@@ -565,12 +551,11 @@ function extractOfferLines(replyText) {
 
   // ── B) REFUSAL / PIVOT BLACKLIST ─────────────────────────────────────────
   const REFUSAL_PHRASES = [
-    "outside jeremy",
-    "outside his core",
-    "not in jeremy",
-    "not within jeremy",
-    "i can tell you about his expertise",
-    "i can tell you about jeremy",
+    "outside devsecure",
+    "outside our core",
+    "not in devsecure",
+    "not within devsecure",
+    "i can tell you about our capabilities",
     "i can\u2019t help with",
     "i can't help with",
     "i can\u2019t answer",
@@ -628,14 +613,6 @@ function extractOfferLines(replyText) {
 
 // Returns a pool of 3 suggestions based on keyword routing.
 function pickPool(replyText, userMessage, wantPersonal) {
-  if (wantPersonal) {
-    return [
-      "What hobbies or sports do you enjoy?",
-      "What food and drink do you like?",
-      "What do you do outside of work?",
-    ];
-  }
-
   const haystack = ((replyText || "") + " " + (userMessage || "")).toLowerCase();
 
   // Risk scoring
@@ -667,9 +644,9 @@ function pickPool(replyText, userMessage, wantPersonal) {
 
   // Professional default
   return [
-    "What AppSec areas are you strongest in?",
-    "Describe your SAST/auto-fix safety approach.",
-    "How do you build risk scoring from EPSS/CVSS/KEV?",
+    "How does the autonomous SAST auto-fix work?",
+    "What is the pricing for a team of 10?",
+    "Explain the Multi-Agent Debate architecture.",
   ];
 }
 

@@ -1,6 +1,6 @@
 // Author: Jeremy Quadri
 // functions/api/webhook/telegram.js
-// Receives Telegram Bot webhook POSTs when Jeremy replies to a forwarded message.
+// Receives Telegram Bot webhook POSTs when a support agent replies to a forwarded message.
 // Parses the session ID from the original message and stores the reply in KV.
 
 export async function onRequestPost({ request, env }) {
@@ -16,7 +16,7 @@ export async function onRequestPost({ request, env }) {
     expectedChatId: env.TELEGRAM_CHAT_ID,
   }));
 
-  // Only process text messages from Jeremy's personal chat
+  // Only process text messages from the authorized support chat
   if (!message?.text || message.chat?.id?.toString() !== env.TELEGRAM_CHAT_ID) {
     console.log('[webhook] DROPPED: chat ID mismatch or no text', {
       got: message?.chat?.id?.toString(),

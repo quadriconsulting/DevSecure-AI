@@ -12,15 +12,9 @@ export default function App() {
       <Navbar />
       <Hero />
 
-      {/* Chat is the product — inline, full-width, centered below the hero */}
-      <section id="chat" className="py-16 px-4 sm:px-6 bg-obsidianLight">
-        <div className="max-w-2xl mx-auto">
-          <AIConcierge inline />
-        </div>
-      </section>
-
       <Features />
       <Footer />
+      <AIConcierge />
     </div>
   );
 }

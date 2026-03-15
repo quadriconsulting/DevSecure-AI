@@ -132,7 +132,7 @@ interface VisitorMemory {
 interface ChatResponse {
     reply: string
     suggested: string[]
-    action?: 'SHOW_CV' | 'SHOW_CALENDAR' | 'RENDER_SVG' | 'RENDER_CODE' | 'wait_for_jeremy'
+    action?: 'SHOW_CV' | 'SHOW_CALENDAR' | 'RENDER_SVG' | 'RENDER_CODE' | 'wait_for_agent'
     codeSnippet?: {
         language: string
         content: string
@@ -183,7 +183,7 @@ const AIConcierge = ({ inline = false }: Props) => {
     const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const holdShownRef = useRef(false)
 
-    const isWaitingForJeremy = messages.some(m => m.action === 'wait_for_jeremy')
+    const isWaitingForAgent = messages.some(m => m.action === 'wait_for_agent')
 
     // Manage persistent visitor UUID
     useEffect(() => {
@@ -207,19 +207,19 @@ const AIConcierge = ({ inline = false }: Props) => {
 
     // Reset activity clock when live mode starts
     useEffect(() => {
-        if (isWaitingForJeremy) lastActivityRef.current = Date.now()
-    }, [isWaitingForJeremy])
+        if (isWaitingForAgent) lastActivityRef.current = Date.now()
+    }, [isWaitingForAgent])
 
     // 15-second hold message
     useEffect(() => {
-        const isLive = messages.some(m => m.action === 'wait_for_jeremy')
+        const isLive = messages.some(m => m.action === 'wait_for_agent')
 
         if (isLive && !holdShownRef.current && !holdTimerRef.current) {
             holdTimerRef.current = setTimeout(() => {
                 holdTimerRef.current = null
                 holdShownRef.current = true
                 setMessages(prev => {
-                    if (!prev.some(m => m.action === 'wait_for_jeremy')) return prev
+                    if (!prev.some(m => m.action === 'wait_for_agent')) return prev
                     return [...prev, {
                         role: 'assistant' as const,
                         content: 'Our team is reviewing your query. A specialist will respond shortly.',
@@ -254,7 +254,7 @@ const AIConcierge = ({ inline = false }: Props) => {
 
     // Adaptive polling — burst 2s / standard 5s / paused when idle or tab hidden
     useEffect(() => {
-        if (!memory?.uuid || !isWaitingForJeremy) return
+        if (!memory?.uuid || !isWaitingForAgent) return
         let active = true
         let nextTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -268,7 +268,7 @@ const AIConcierge = ({ inline = false }: Props) => {
             if (Date.now() - lastActivityRef.current > 15 * 60 * 1000) {
                 fetch(`/api/chat/sync?sessionId=${memory.uuid}&tenant_id=${TENANT_ID}&end=1`).catch(() => {})
                 setMessages(prev => prev.map(m =>
-                    m.action === 'wait_for_jeremy' ? { ...m, action: undefined } : m
+                    m.action === 'wait_for_agent' ? { ...m, action: undefined } : m
                 ))
                 return
             }
@@ -306,7 +306,7 @@ const AIConcierge = ({ inline = false }: Props) => {
                     }
                     if (released) {
                         setMessages(prev =>
-                            prev.map(m => m.action === 'wait_for_jeremy' ? { ...m, action: undefined } : m)
+                            prev.map(m => m.action === 'wait_for_agent' ? { ...m, action: undefined } : m)
                         )
                     }
                 }
@@ -331,12 +331,13 @@ const AIConcierge = ({ inline = false }: Props) => {
             if (nextTimer) clearTimeout(nextTimer)
             document.removeEventListener('visibilitychange', onVisible)
         }
-    }, [memory?.uuid, isWaitingForJeremy])
+    }, [memory?.uuid, isWaitingForAgent])
 
     const defaultSuggestions = [
-        "How does your SAST engine detect complex vulnerabilities?",
-        "Explain the multi-agent autonomous remediation pipeline.",
-        "What security engines does DevSecure cover?"
+        "How does the autonomous SAST auto-fix work?",
+        "What is the pricing for a team of 10?",
+        "Explain the Multi-Agent Debate architecture.",
+        "Can I book a demo?",
     ]
 
     const sendMessage = async (text: string) => {
@@ -358,7 +359,7 @@ const AIConcierge = ({ inline = false }: Props) => {
             if (!res.ok) throw new Error('bad status')
 
             const data = await res.json() as ChatResponse
-            if (!data.reply && data.action !== 'wait_for_jeremy') throw new Error('missing reply')
+            if (!data.reply && data.action !== 'wait_for_agent') throw new Error('missing reply')
 
             setMessages(prev => [...prev, {
                 role: 'assistant',
@@ -424,6 +425,9 @@ const AIConcierge = ({ inline = false }: Props) => {
             <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6 scrollbar-hide">
                 {messages.length === 0 && (
                     <div className="space-y-4 pt-4">
+                        <div className="bg-[#111111]/60 backdrop-blur-md text-[#F4E8D1]/90 rounded-2xl rounded-tl-sm border border-[#F4E8D1]/10 p-4 text-[14px] leading-relaxed tracking-wide">
+                            Thanks for chatting with us. (Real humans on standby for you.) What would you like to discuss with us?
+                        </div>
                         <p className="text-xs uppercase tracking-widest text-[#F4E8D1]/40 text-center font-medium">Ask about DevSecure</p>
                         <div className="flex flex-col gap-2">
                             {defaultSuggestions.map((q, idx) => (
@@ -503,7 +507,7 @@ const AIConcierge = ({ inline = false }: Props) => {
                                             <ArchitectureDiagram />
                                         )}
 
-                                        {msg.action === 'wait_for_jeremy' && (
+                                        {msg.action === 'wait_for_agent' && (
                                             <div className="flex items-center gap-2 mt-3 opacity-70">
                                                 <div className="w-1.5 h-1.5 bg-[#F4E8D1] rounded-full animate-bounce" />
                                                 <div className="w-1.5 h-1.5 bg-[#F4E8D1] rounded-full animate-bounce [animation-delay:-.2s]" />
