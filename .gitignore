@@ -1,6 +1,20 @@
+# IDE
 .vs/
 .vscode/
-bin/
-obj/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
 node_modules/
+
+# Logs
 *.log
+
+# Python
+__pycache__/
+
+# Secrets
+.env
+.env.local

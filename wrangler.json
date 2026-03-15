@@ -1,0 +1,25 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "jq",
+	"compatibility_date": "2024-01-01",
+	"pages_build_output_dir": "./dist",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"ai": {
+		"binding": "AI"
+	},
+	"vectorize": [
+		{
+			"binding": "VEC_INDEX",
+			"index_name": "jq-rag"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "CHAT_STATE",
+			"id": "d6e9d22882bb474a955770ee2985194a",
+			"remote": true
+		}
+	]
+}
