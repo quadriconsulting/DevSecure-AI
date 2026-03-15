@@ -17,9 +17,9 @@ export async function onRequestGet({ request, env }) {
   const tenantId = rawTenantId.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'default';
 
   // Tenant-scoped KV key names — must mirror the constants in chat.js.
-  const KV_SESSION    = `${tenantId}:last_active_session`;
-  const KV_SESSION_TS = `${tenantId}:last_active_session_ts`;
-  const KV_HANDOFF    = `${tenantId}:handoff_active`;
+  const KV_SESSION    = `tenant:${tenantId}:session`;
+  const KV_SESSION_TS = `tenant:${tenantId}:session_ts`;
+  const KV_HANDOFF    = `tenant:${tenantId}:handoff`;
 
   if (!sessionId || !env.CHAT_STATE) {
     return Response.json({ messages: [] }, noStore);
@@ -42,8 +42,8 @@ export async function onRequestGet({ request, env }) {
     return Response.json({ messages: [] }, noStore);
   }
 
-  // Reply keys are written by telegram.js as `${tenantId}:reply:${sessionId}:${ts}`.
-  const prefix = `${tenantId}:reply:${sessionId}:`;
+  // Reply keys are written by telegram.js as `tenant:${tenantId}:reply:${sessionId}:${ts}`.
+  const prefix = `tenant:${tenantId}:reply:${sessionId}:`;
 
   // First check
   const first = await env.CHAT_STATE.list({ prefix }).catch(() => ({ keys: [] }));

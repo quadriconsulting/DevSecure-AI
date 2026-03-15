@@ -21,10 +21,10 @@ export async function onRequestPost({ request, env }) {
   const rawTenantId = (body?.tenant_id || "").toString().slice(0, 64).trim();
   const tenantId = rawTenantId.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'default';
 
-  // Tenant-scoped KV key names — ensures strict namespace isolation across tenants.
-  const KV_SESSION    = `${tenantId}:last_active_session`;
-  const KV_SESSION_TS = `${tenantId}:last_active_session_ts`;
-  const KV_HANDOFF    = `${tenantId}:handoff_active`;
+  // Tenant-scoped KV key names — formalized namespace: tenant:{tenant_id}:<resource>
+  const KV_SESSION    = `tenant:${tenantId}:session`;
+  const KV_SESSION_TS = `tenant:${tenantId}:session_ts`;
+  const KV_HANDOFF    = `tenant:${tenantId}:handoff`;
 
   // Resolve Telegram Chat ID — tenant-specific env var takes priority over global fallback.
   // e.g. TG_CHAT_ID_DEVSECURE, TG_CHAT_ID_ACME, etc.
@@ -32,7 +32,6 @@ export async function onRequestPost({ request, env }) {
 
   console.log('[chat] bindings:', {
     tenantId,
-    hasAI: Boolean(env?.AI),
     hasVEC: Boolean(env?.VEC_INDEX),
     hasCHAT_STATE: Boolean(env?.CHAT_STATE),
     hasTG_TOKEN: Boolean(env?.TELEGRAM_BOT_TOKEN),
@@ -120,34 +119,47 @@ export async function onRequestPost({ request, env }) {
   const ambiguousSelf = isAmbiguousAboutSelf(message);
 
   // Fail fast if bindings are missing
-  if (!env?.AI || !env?.VEC_INDEX) {
+  if (!env?.VEC_INDEX || !env?.OPENAI_API_KEY) {
     const payload = debug
-      ? { ok: false, error: "MISSING_BINDINGS", hasAI: Boolean(env?.AI), hasVEC_INDEX: Boolean(env?.VEC_INDEX) }
-      : { reply: "Assistant is not configured yet (missing AI/Vectorize bindings).", suggested: suggestFollowups(false) };
+      ? { ok: false, error: "MISSING_BINDINGS", hasVEC_INDEX: Boolean(env?.VEC_INDEX), hasOPENAI: Boolean(env?.OPENAI_API_KEY) }
+      : { reply: "Assistant is not configured yet (missing Vectorize or OpenAI binding).", suggested: suggestFollowups(false) };
     return Response.json(payload, { status: 500 });
   }
 
-  // 1) Embed the query
+  // 1) Embed the query — OpenAI text-embedding-3-small (1536-dim, matches jq-rag index)
   let qVec = [];
   try {
-    const qEmb = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [message] });
-    qVec = (qEmb?.data || qEmb || [])[0] || [];
+    const embResp = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'authorization': `Bearer ${env.OPENAI_API_KEY}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: message,
+        dimensions: 1536,
+      }),
+    });
+    if (!embResp.ok) throw new Error(`OpenAI embeddings status ${embResp.status}`);
+    const embData = await embResp.json();
+    qVec = embData?.data?.[0]?.embedding || [];
   } catch (e) {
-    console.error('[chat] EMBEDDING_FAILED', e);
+    console.error('[chat] EMBEDDING_FAILED', e?.message);
     return Response.json(
       debug
-        ? { ok: false, error: "EMBEDDING_FAILED", qVecLen: 0, note: "Embedding call threw (Workers AI binding/model)." }
+        ? { ok: false, error: "EMBEDDING_FAILED", qVecLen: 0, note: e?.message }
         : { reply: "Assistant error: embedding step failed. Please try again.", suggested: suggestFollowups(wantPersonal) },
       { status: 500 }
     );
   }
 
   const qVecLen = Array.isArray(qVec) ? qVec.length : 0;
-  if (qVecLen !== 768) {
+  if (qVecLen !== 1536) {
     console.error('[chat] BAD_QUERY_VECTOR', { qVecLen });
     return Response.json(
       debug
-        ? { ok: false, error: "BAD_QUERY_VECTOR", qVecLen, expected: 768 }
+        ? { ok: false, error: "BAD_QUERY_VECTOR", qVecLen, expected: 1536 }
         : { reply: "Assistant error: invalid query vector. Please try again.", suggested: suggestFollowups(wantPersonal) },
       { status: debug ? 400 : 500 }
     );
@@ -159,7 +171,7 @@ export async function onRequestPost({ request, env }) {
 
   let baselineMatches = [];
   try {
-    const baseline = await env.VEC_INDEX.query(qVec, { topK: baselineTopK, returnMetadata: true, filter: { tenant: tenantId } });
+    const baseline = await env.VEC_INDEX.query(qVec, { topK: baselineTopK, returnMetadata: true, filter: { tenant_id: tenantId } });
     baselineMatches = normalizeMatches(baseline).matches;
   } catch (e) {
     console.error('[chat] VECTOR_BASELINE_QUERY_FAILED', e);
@@ -179,8 +191,8 @@ export async function onRequestPost({ request, env }) {
   // 3) Filtered query — always scoped to this tenant; additionally filter by
   //    type="professional" unless the user explicitly asked for personal content.
   const filterUsed = wantPersonal
-    ? { tenant: tenantId }
-    : { tenant: tenantId, type: "professional" };
+    ? { tenant_id: tenantId }
+    : { tenant_id: tenantId, type: "professional" };
   let matches = [];
   let fallbackUsed = false;
   try {
@@ -200,7 +212,7 @@ export async function onRequestPost({ request, env }) {
   } catch {
     // Fallback: post-filter from baseline (or a fresh broader query)
     try {
-      const raw = await env.VEC_INDEX.query(qVec, { topK: 12, returnMetadata: true, filter: { tenant: tenantId } });
+      const raw = await env.VEC_INDEX.query(qVec, { topK: 12, returnMetadata: true, filter: { tenant_id: tenantId } });
       const arr = normalizeMatches(raw).matches;
       matches = arr.filter(m => wantPersonal || m?.metadata?.type !== "personal").slice(0, topK);
     } catch (e2) {
@@ -263,7 +275,7 @@ export async function onRequestPost({ request, env }) {
   const ctx = matches
     .map((m, i) => {
       const meta = m?.metadata || {};
-      const chunk = (meta?.chunk || "").toString().trim().slice(0, CHUNK_CAP);
+      const chunk = (meta?.text || "").toString().trim().slice(0, CHUNK_CAP);
       const header = `[#${i + 1} ${meta.source || "doc"} | ${meta.section || "root"} | type=${meta.type || "?"}]`;
       return chunk ? `${header}\n${chunk}` : `${header}\n(no chunk)`;
     })
