@@ -8,6 +8,10 @@ on:
       - 'rag_docs/**'
       - 'scripts/ingest.js'
 
+concurrency:
+  group: vectorize-ingest
+  cancel-in-progress: false
+
 jobs:
   update-rag:
     runs-on: ubuntu-latest

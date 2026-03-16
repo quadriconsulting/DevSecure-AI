@@ -206,7 +206,7 @@ const AIConcierge = ({ inline = false }: Props) => {
 
     const [messages, setMessages] = useState<Array<Message>>(() => {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem(STORAGE_HISTORY_KEY)
+            const saved = sessionStorage.getItem(STORAGE_HISTORY_KEY)
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved)
@@ -293,10 +293,10 @@ const AIConcierge = ({ inline = false }: Props) => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages, loading])
 
-    // Persist messages to localStorage
+    // Persist messages to sessionStorage — cleared automatically on tab close
     useEffect(() => {
         if (messages.length > 0) {
-            localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(messages))
+            sessionStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(messages))
         }
     }, [messages])
 
@@ -428,7 +428,7 @@ const AIConcierge = ({ inline = false }: Props) => {
 
     const clearChat = () => {
         setMessages([])
-        localStorage.removeItem(STORAGE_HISTORY_KEY)
+        sessionStorage.removeItem(STORAGE_HISTORY_KEY)
     }
 
     // --- PANEL JSX (shared between inline and floating modes) ---
