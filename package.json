@@ -4,9 +4,13 @@
   "scripts": {
     "dev": "vite",
     "dev:sandbox": "wrangler pages dev dist --ip 0.0.0.0 --port 3001",
+    "dev:devsecure": "wrangler pages dev dist --ip 0.0.0.0 --port 3001 --config wrangler.devsecure.json",
+    "dev:jq": "wrangler pages dev dist --ip 0.0.0.0 --port 3001 --config wrangler.jq.json",
     "build": "vite build",
     "preview": "wrangler pages dev dist",
-    "deploy": "npm run build && wrangler pages deploy dist",
+    "deploy:devsecure": "npm run build && wrangler pages deploy ./dist --project-name devsecure-ai --config wrangler.devsecure.json",
+    "deploy:jq": "npm run build && wrangler pages deploy ./dist --project-name jq-tcr --config wrangler.jq.json",
+    "deploy:jquadri": "npm run build && wrangler pages deploy ./dist --project-name jquadri-fit --config wrangler.jquadri.json",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "clean-port": "fuser -k 3001/tcp 2>/dev/null || true"
   },

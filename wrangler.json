@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "jq",
+	"name": "devsecure-ai",
 	"compatibility_date": "2024-01-01",
 	"pages_build_output_dir": "./dist",
 	"compatibility_flags": [
@@ -18,7 +18,7 @@
 	"kv_namespaces": [
 		{
 			"binding": "CHAT_STATE",
-			"id": "d6e9d22882bb474a955770ee2985194a",
-					}
+			"id": "d6e9d22882bb474a955770ee2985194a"
+		}
 	]
 }
