@@ -186,20 +186,35 @@ export async function onRequestPost({ request, env, context }) {
         { headers: { 'Authorization': `Bearer ${env.RPS_API_TOKEN}` } }
       );
       if (rpsResponse.ok) {
-        const rpsData = await rpsResponse.json();
+        const jsonResponse = await rpsResponse.json();
+        const rpsData = jsonResponse.data; // Extract from the nested data object
+
+        // Map all dataset presences
+        const foundIn = [];
+        if (rpsData.is_kev) foundIn.push("🚨 CISA KEV (Active)");
+        if (rpsData.is_exploitdb) foundIn.push("ExploitDB");
+        if (rpsData.in_ghsa) foundIn.push("GitHub Advisories");
+        if (rpsData.has_cvefixes) foundIn.push("CVEfixes/Patch Data");
+        if (rpsData.data_sources && rpsData.data_sources.length > 0) {
+          rpsData.data_sources.forEach(ds => {
+            if (!foundIn.includes(ds)) foundIn.push(ds);
+          });
+        }
+
         const epssPercent = rpsData.epss_score != null ? (rpsData.epss_score * 100).toFixed(2) + "%" : "N/A";
         const kevStatus = rpsData.is_kev ? "⚠️ ACTIVE" : "Inactive";
-        const foundIn = Array.isArray(rpsData.found_in) ? rpsData.found_in : [];
+
+        // Only show the dataset line if there are actually datasets
+        const datasetLine = foundIn.length > 0 ? `\n* **Found in Datasets:** ${foundIn.join(", ")}` : "";
 
         // Deterministic UI card — prepended to the reply, not trusted to the LLM
         threatCardUI = `### ⚠️ Threat Intelligence: ${rpsData.cve_id}
 * **RPS Score:** **${rpsData.rps_score}%** (${rpsData.severity})
 * **CVSS Score:** ${rpsData.cvss_score} (${rpsData.cvss_source || "NVD"})
 * **EPSS Probability:** ${epssPercent}
-* **Exploited in the Wild (KEV):** ${kevStatus}
-* **Found in Datasets:** ${foundIn.join(", ") || "N/A"}\n\n`;
+* **Exploited in the Wild (KEV):** ${kevStatus}${datasetLine}\n\n`;
 
-        // LLM only generates the summary — card is already handled by the UI
+        // Tell the LLM to ONLY generate the summary
         cveContext = `\nSYSTEM NOTE: The user asked about ${rpsData.cve_id}. The structured threat data is already being displayed to them by the UI. You MUST ONLY output a 1-3 sentence technical explanation of the vulnerability. Do not output scores.\n`;
         console.log('[chat] CVE_LOOKUP_OK', cveId);
       } else {
