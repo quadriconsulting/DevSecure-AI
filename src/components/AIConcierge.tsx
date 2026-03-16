@@ -1,5 +1,5 @@
 // Author: Jeremy Quadri
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import mermaid from 'mermaid'
 import { MessageSquare, Send, X, Sparkles, Shield } from 'lucide-react'
 
@@ -147,6 +147,29 @@ interface Message {
     suggested?: string[]
     isNew?: boolean
 }
+
+const SUPPORT_QUESTIONS = [
+    "Why did DevSecure block my pull request?",
+    "Which deterministic gate caused my remediation patch to fail?",
+    "How do I re-run a DevSecure scan in my CI pipeline?",
+    "How do I configure DevSecure scanning in GitHub Actions?",
+    "Why did the auto-fix PR fail compilation tests?",
+    "Why is this vulnerability marked high risk?",
+    "What factors contributed to this RPS risk score?",
+    "Is this vulnerability actively exploited in the wild?",
+    "Show me the code path that makes this vulnerability reachable.",
+    "How do I suppress a false positive finding?",
+    "Why did DevSecure reject the AI-generated remediation patch?",
+    "How do I review and approve an auto-generated fix?",
+    "Can DevSecure generate a patch for this vulnerability?",
+    "Show me the judge decision for this remediation proposal.",
+    "DevSecure detected a secret — what should I do next?",
+    "How do I rotate an exposed API key safely?",
+    "Which dependency introduced this vulnerability?",
+    "How do I upgrade the vulnerable library safely?",
+    "How do I export a security report for my project?",
+    "Where can I see vulnerability trends across my repositories?",
+]
 
 interface Props {
     /** Render the chat panel inline (embedded in page) vs floating bottom-right */
@@ -333,12 +356,10 @@ const AIConcierge = ({ inline = false }: Props) => {
         }
     }, [memory?.uuid, isWaitingForAgent])
 
-    const defaultSuggestions = [
-        "How does the autonomous SAST auto-fix work?",
-        "What is the pricing for a team of 10?",
-        "Explain the Multi-Agent Debate architecture.",
-        "Can I book a demo?",
-    ]
+    const defaultSuggestions = useMemo(() => {
+        const shuffled = [...SUPPORT_QUESTIONS].sort(() => 0.5 - Math.random())
+        return shuffled.slice(0, 4)
+    }, [])
 
     const sendMessage = async (text: string) => {
         lastActivityRef.current = Date.now()
