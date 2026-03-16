@@ -6,7 +6,7 @@
 
 // Resolves tenantId from the incoming Telegram chat ID using hybrid routing:
 //   1. Check dedicated tenant env vars: TG_CHAT_ID_{TENANT_ID_UPPER} → tenantId
-//   2. Fall back to global TELEGRAM_CHAT_ID → 'default'
+//   2. Fall back to global TELEGRAM_CHAT_ID → 'devsecure'
 // Returns null if the chat ID is not authorized.
 function resolveTenantFromChatId(env, incomingChatId) {
   const id = incomingChatId?.toString();
@@ -20,7 +20,7 @@ function resolveTenantFromChatId(env, incomingChatId) {
   }
 
   // Fall back to shared global resource
-  if (env.TELEGRAM_CHAT_ID?.toString() === id) return 'default';
+  if (env.TELEGRAM_CHAT_ID?.toString() === id) return 'devsecure';
 
   return null; // unauthorized
 }
@@ -76,26 +76,36 @@ export async function onRequestPost({ request, env }) {
   }
   // --- END HANDOFF EXIT ---
 
-  // Try reply_to_message first; fall back to tenant-scoped last active session
+  // Try reply_to_message first; fall back to tenant-scoped last active session.
+  // Also extract tenant directly from the message tag so routing is always exact,
+  // regardless of which Telegram chat the reply arrives from.
   const originalText = message.reply_to_message?.text || '';
+  const tenantMatch  = originalText.match(/\[Tenant: ([a-zA-Z0-9_-]+)\]/);
+  const resolvedTenantId = tenantMatch ? tenantMatch[1].toLowerCase() : tenantId;
+
+  // Re-derive KV keys if the embedded tenant differs from the chat-ID-resolved one
+  const KV_SESSION_R    = `tenant:${resolvedTenantId}:session`;
+  const KV_SESSION_TS_R = `tenant:${resolvedTenantId}:session_ts`;
+  const KV_HANDOFF_R    = `tenant:${resolvedTenantId}:handoff`;
+
   const match = originalText.match(/\[Session: ([a-f0-9-]{36})\]/);
   let sessionId;
   if (match) {
     sessionId = match[1];
-    console.log('[webhook] sessionId from reply_to_message', sessionId);
+    console.log('[webhook] sessionId from reply_to_message', sessionId, '(resolvedTenant=' + resolvedTenantId + ')');
   } else {
-    const fallback = env.CHAT_STATE ? await env.CHAT_STATE.get(KV_SESSION) : null;
+    const fallback = env.CHAT_STATE ? await env.CHAT_STATE.get(KV_SESSION_R) : null;
     if (!fallback) {
-      console.log('[webhook] DROPPED: no reply_to_message and no active session in KV (tenant=' + tenantId + ')');
+      console.log('[webhook] DROPPED: no reply_to_message and no active session in KV (tenant=' + resolvedTenantId + ')');
       return new Response('OK');
     }
     sessionId = fallback;
-    console.log('[webhook] sessionId from KV session fallback', sessionId, '(tenant=' + tenantId + ')');
+    console.log('[webhook] sessionId from KV session fallback', sessionId, '(tenant=' + resolvedTenantId + ')');
   }
-  console.log('[webhook] storing reply for session', sessionId, '(tenant=' + tenantId + ')');
+  console.log('[webhook] storing reply for session', sessionId, '(tenant=' + resolvedTenantId + ')');
 
-  const msgKey = `tenant:${tenantId}:reply:${sessionId}:${Date.now()}`;
-  console.log('[webhook] KV write start', { msgKey, sessionId, tenantId, hasKV: Boolean(env.CHAT_STATE) });
+  const msgKey = `tenant:${resolvedTenantId}:reply:${sessionId}:${Date.now()}`;
+  console.log('[webhook] KV write start', { msgKey, sessionId, resolvedTenantId, hasKV: Boolean(env.CHAT_STATE) });
   await env.CHAT_STATE.put(msgKey, message.text, { expirationTtl: 86400 });
   console.log('[webhook] KV write success: reply key', msgKey);
   await env.CHAT_STATE.put(`version:${sessionId}`, Date.now().toString(), { expirationTtl: 86400 });

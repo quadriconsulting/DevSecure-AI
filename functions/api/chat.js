@@ -56,7 +56,7 @@ export async function onRequestPost({ request, env }) {
         await env.CHAT_STATE.put(KV_SESSION_TS, Date.now().toString(), { expirationTtl: 86400 }).catch(() => {});
         console.log('[chat] TWO_WAY_BRIDGE re-established session from handoff_active', uuid);
       }
-      const tgText = `💬 Visitor: "${message}"`;
+      const tgText = `💬 Visitor: "${message}"\n\n[Tenant: ${tenantId}] [Session: ${uuid}]`;
       if (env.TELEGRAM_BOT_TOKEN && tgChatId) {
         await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
           method: 'POST',
@@ -75,7 +75,7 @@ export async function onRequestPost({ request, env }) {
   // --- PRE-AI TELEGRAM INTERCEPTOR ---
   const INTERCEPT_RE = /\b(waf|quote|contract|rate|rates|pricing)\b/i;
   if (INTERCEPT_RE.test(message)) {
-    const tgText = `🔔 High-value inquiry [Session: ${uuid}]\n\n"${message}"\n\n↩ Reply to this message to respond in the visitor's chat.`;
+    const tgText = `🔔 High-value inquiry [Tenant: ${tenantId}] [Session: ${uuid}]\n\n"${message}"\n\n↩ Reply to this message to respond in the visitor's chat.`;
     if (env.TELEGRAM_BOT_TOKEN && tgChatId) {
       try {
         const tgResp = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -331,7 +331,11 @@ MANDATORY DIAGRAMS
 - The 60-word prose limit applies to descriptive text only, not the mermaid block.
 
 RESOURCE MAP (IMMUTABLE LINKS)
-- Book a Demo: https://devsecure.com/demo
+- Book a Demo / Schedule a Meeting / Talk to Sales: https://calendar.app.google/8cPb8oBThkN1g3zq5
+
+CALENDAR RULE (MANDATORY)
+- If the user asks to schedule a meeting, book a demo, or talk to sales, you MUST provide this exact calendar link in your response: https://calendar.app.google/8cPb8oBThkN1g3zq5
+- Never substitute, shorten, or paraphrase this URL.
 
 JSON OUTPUT CONTRACT
 - Respond with a valid JSON object.
