@@ -177,6 +177,7 @@ export async function onRequestPost({ request, env, context }) {
   // from the DevSecure RPS API to inject as enriched context for the AI.
   const cveMatch = message.match(/CVE-\d{4}-\d{4,7}/i);
   let cveContext = "";
+  let threatCardUI = "";
   if (cveMatch) {
     const cveId = cveMatch[0].toUpperCase();
     try {
@@ -186,7 +187,20 @@ export async function onRequestPost({ request, env, context }) {
       );
       if (rpsResponse.ok) {
         const rpsData = await rpsResponse.json();
-        cveContext = `\nLIVE RPS API DATA FOR ${cveId}:\n${JSON.stringify(rpsData.data)}\n`;
+        const epssPercent = rpsData.epss_score != null ? (rpsData.epss_score * 100).toFixed(2) + "%" : "N/A";
+        const kevStatus = rpsData.is_kev ? "⚠️ ACTIVE" : "Inactive";
+        const foundIn = Array.isArray(rpsData.found_in) ? rpsData.found_in : [];
+
+        // Deterministic UI card — prepended to the reply, not trusted to the LLM
+        threatCardUI = `### ⚠️ Threat Intelligence: ${rpsData.cve_id}
+* **RPS Score:** **${rpsData.rps_score}%** (${rpsData.severity})
+* **CVSS Score:** ${rpsData.cvss_score} (${rpsData.cvss_source || "NVD"})
+* **EPSS Probability:** ${epssPercent}
+* **Exploited in the Wild (KEV):** ${kevStatus}
+* **Found in Datasets:** ${foundIn.join(", ") || "N/A"}\n\n`;
+
+        // LLM only generates the summary — card is already handled by the UI
+        cveContext = `\nSYSTEM NOTE: The user asked about ${rpsData.cve_id}. The structured threat data is already being displayed to them by the UI. You MUST ONLY output a 1-3 sentence technical explanation of the vulnerability. Do not output scores.\n`;
         console.log('[chat] CVE_LOOKUP_OK', cveId);
       } else {
         console.warn('[chat] CVE_LOOKUP_HTTP', rpsResponse.status, cveId);
@@ -460,12 +474,15 @@ Respond with a valid JSON object containing at minimum a "reply" string.
     ? (rawReplyText || '').trim()
     : capReply(rawReplyText, HARD_CHAR_CAP);
 
+  // Deterministically prepend the threat card — LLM output is only the summary
+  const finalReply = threatCardUI ? threatCardUI + reply : reply;
+
   // Persist updated memory non-blockingly — 30-day TTL, 10-turn rolling window
   if (memoryKey && env.CHAT_STATE && context?.waitUntil) {
     const updatedMemory = [
       ...pastMemory,
       { role: 'user', content: message },
-      { role: 'assistant', content: reply },
+      { role: 'assistant', content: finalReply },
     ].slice(-10);
     context.waitUntil(
       env.CHAT_STATE.put(memoryKey, JSON.stringify(updatedMemory), { expirationTtl: 2592000 })
@@ -473,7 +490,7 @@ Respond with a valid JSON object containing at minimum a "reply" string.
   }
 
   return corsJson({
-    reply,
+    reply: finalReply,
     suggested: buildSuggestedFromReply(reply, wantPersonal, message),
     action,
     codeSnippet,
