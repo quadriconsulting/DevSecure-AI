@@ -172,6 +172,31 @@ export async function onRequestPost({ request, env, context }) {
   }
   // --- END PRE-AI INTERCEPTOR ---
 
+  // --- REAL-TIME CVE LOOKUP ---
+  // Detect CVE IDs in the user's message and fetch live threat intelligence
+  // from the DevSecure RPS API to inject as enriched context for the AI.
+  const cveMatch = message.match(/CVE-\d{4}-\d{4,7}/i);
+  let cveContext = "";
+  if (cveMatch) {
+    const cveId = cveMatch[0].toUpperCase();
+    try {
+      const rpsResponse = await fetch(
+        `https://rps-api-production-1050984944087.europe-west2.run.app/api/v1/rps?cve_id=${encodeURIComponent(cveId)}`,
+        { headers: { 'Authorization': `Bearer ${env.RPS_API_TOKEN}` } }
+      );
+      if (rpsResponse.ok) {
+        const rpsData = await rpsResponse.json();
+        cveContext = `\nLIVE RPS API DATA FOR ${cveId}:\n${JSON.stringify(rpsData.data)}\n`;
+        console.log('[chat] CVE_LOOKUP_OK', cveId);
+      } else {
+        console.warn('[chat] CVE_LOOKUP_HTTP', rpsResponse.status, cveId);
+      }
+    } catch (e) {
+      console.error('[chat] CVE_LOOKUP_FAILED', e?.message);
+    }
+  }
+  // --- END CVE LOOKUP ---
+
   const wantPersonal = isExplicitPersonalIntent(message);
   const ambiguousSelf = isAmbiguousAboutSelf(message);
 
@@ -406,8 +431,7 @@ User question:
 ${message}
 
 Retrieved context:
-${ctx || "(no matches returned)"}
-
+${ctx || "(no matches returned)"}${cveContext}
 Answer using retrieved context as the primary source for DevSecure-specific questions. Do not use mechanical retrieval language.
 IMPORTANT: Be extremely brief. Answer in exactly ONE short sentence. If you include "For example, I can help with:", put it immediately after that sentence using literal hyphen bullets (- ).
 Respond with a valid JSON object containing at minimum a "reply" string.
