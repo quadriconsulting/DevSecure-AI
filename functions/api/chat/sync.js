@@ -5,9 +5,30 @@
 
 const WAIT_MS = 2000;
 
-const noStore = { headers: { 'Cache-Control': 'no-store', 'Cloudflare-CDN-Cache-Control': 'no-cache' } };
+// CORS — required for cross-origin embeds (widget on external sites).
+// Merged into noStore so every Response.json in this file inherits them automatically.
+const noStore = {
+  headers: {
+    'Cache-Control': 'no-store',
+    'Cloudflare-CDN-Cache-Control': 'no-cache',
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  },
+};
 
 export async function onRequestGet({ request, env }) {
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin':  '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
+    });
+  }
   const url = new URL(request.url);
   const sessionId = (url.searchParams.get('sessionId') || '').slice(0, 64).trim();
 

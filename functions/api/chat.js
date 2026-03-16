@@ -8,7 +8,26 @@
 const SOFT_CHAR_TARGET = 280;
 const HARD_CHAR_CAP    = 480;
 
+// CORS — required for cross-origin embeds (widget on external sites)
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+// Drop-in replacement for Response.json that always includes CORS headers.
+function corsJson(body, init = {}) {
+  return Response.json(body, {
+    ...init,
+    headers: { ...CORS_HEADERS, ...(init.headers || {}) },
+  });
+}
+
 export async function onRequestPost({ request, env }) {
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
   const url = new URL(request.url);
   const debug = url.searchParams.get("debug") === "1";
 
@@ -40,7 +59,7 @@ export async function onRequestPost({ request, env }) {
   });
 
   if (!message) {
-    return Response.json({ reply: "Ask me a question and I'll help." }, { status: 400 });
+    return corsJson({ reply: "Ask me a question and I'll help." }, { status: 400 });
   }
 
   // --- TWO-WAY BRIDGE: forward user messages to support agent when session is live ---
@@ -87,18 +106,23 @@ export async function onRequestPost({ request, env }) {
         // Refresh timestamp so auto-timeout resets on each visitor message
         await env.CHAT_STATE.put(KV_SESSION_TS, Date.now().toString(), { expirationTtl: 86400 }).catch(() => {});
         console.log('[chat] TWO_WAY_BRIDGE forwarded to Telegram for session', uuid);
-        return Response.json({ reply: null, action: 'wait_for_agent', suggested: [] });
+        return corsJson({ reply: null, action: 'wait_for_agent', suggested: [] });
       }
     }
   }
   // --- END TWO-WAY BRIDGE ---
 
   // --- PRE-AI TELEGRAM INTERCEPTOR ---
-  // Calendar-intent guard: if the message is primarily about booking/scheduling,
-  // let the AI handle it (it will provide the calendar link) rather than escalating.
-  const INTERCEPT_RE      = /\b(waf|quote|contract|rate|rates|pricing)\b/i;
+  // Fires when the user asks a high-value sales question OR explicitly wants a human agent.
+  // Calendar-intent guard prevents meeting/demo requests from routing to Telegram
+  // (those are handled by the AI which provides the calendar booking link instead).
+  const userText           = (body?.message || '').toLowerCase();
+  const INTERCEPT_RE       = /\b(waf|quote|contract|rate|rates|pricing)\b/i;
   const CALENDAR_INTENT_RE = /\b(meeting|demo|schedule|calendar|book)\b/i;
-  if (INTERCEPT_RE.test(message) && !CALENDAR_INTENT_RE.test(message)) {
+  const wantsHuman = /\b(human|agent|person|representative|support)\b/.test(userText) &&
+                     !/\b(meeting|demo|schedule|calendar)\b/.test(userText);
+
+  if ((INTERCEPT_RE.test(message) && !CALENDAR_INTENT_RE.test(message)) || wantsHuman) {
     const tgText = `🔔 High-value inquiry [Tenant: ${tenantId}] [Session: ${uuid}]\n\n"${message}"\n\n↩ Reply to this message to respond in the visitor's chat.`;
     if (env.TELEGRAM_BOT_TOKEN && tgChatId) {
       try {
@@ -131,7 +155,7 @@ export async function onRequestPost({ request, env }) {
         .catch(e => console.error('[chat] KV_HANDOFF_ACTIVE_WRITE_ERROR', e?.message));
       console.log('[chat] KV write:', KV_HANDOFF, '=', uuid);
     }
-    return Response.json({
+    return corsJson({
       reply: "I've alerted our support team. A specialist will reply here in a moment!",
       action: "wait_for_agent",
       suggested: [],
@@ -147,7 +171,7 @@ export async function onRequestPost({ request, env }) {
     const payload = debug
       ? { ok: false, error: "MISSING_BINDINGS", hasVEC_INDEX: Boolean(env?.VEC_INDEX), hasOPENAI: Boolean(env?.OPENAI_API_KEY) }
       : { reply: "Assistant is not configured yet (missing Vectorize or OpenAI binding).", suggested: suggestFollowups(false) };
-    return Response.json(payload, { status: 500 });
+    return corsJson(payload, { status: 500 });
   }
 
   // 1) Embed the query — OpenAI text-embedding-3-small (1536-dim, matches jq-rag index)
@@ -170,7 +194,7 @@ export async function onRequestPost({ request, env }) {
     qVec = embData?.data?.[0]?.embedding || [];
   } catch (e) {
     console.error('[chat] EMBEDDING_FAILED', e?.message);
-    return Response.json(
+    return corsJson(
       debug
         ? { ok: false, error: "EMBEDDING_FAILED", qVecLen: 0, note: e?.message }
         : { reply: "Assistant error: embedding step failed. Please try again.", suggested: suggestFollowups(wantPersonal) },
@@ -181,7 +205,7 @@ export async function onRequestPost({ request, env }) {
   const qVecLen = Array.isArray(qVec) ? qVec.length : 0;
   if (qVecLen !== 1536) {
     console.error('[chat] BAD_QUERY_VECTOR', { qVecLen });
-    return Response.json(
+    return corsJson(
       debug
         ? { ok: false, error: "BAD_QUERY_VECTOR", qVecLen, expected: 1536 }
         : { reply: "Assistant error: invalid query vector. Please try again.", suggested: suggestFollowups(wantPersonal) },
@@ -199,7 +223,7 @@ export async function onRequestPost({ request, env }) {
     baselineMatches = normalizeMatches(baseline).matches;
   } catch (e) {
     console.error('[chat] VECTOR_BASELINE_QUERY_FAILED', e);
-    return Response.json(
+    return corsJson(
       debug
         ? { ok: false, error: "VECTOR_BASELINE_QUERY_FAILED", qVecLen }
         : { reply: "Assistant error: vector search failed. Please try again.", suggested: suggestFollowups(wantPersonal) },
@@ -241,7 +265,7 @@ export async function onRequestPost({ request, env }) {
       matches = arr.filter(m => wantPersonal || m?.metadata?.type !== "personal").slice(0, topK);
     } catch (e2) {
       console.error('[chat] VECTOR_QUERY_FAILED', e2);
-      return Response.json(
+      return corsJson(
         debug
           ? { ok: false, error: "VECTOR_QUERY_FAILED", qVecLen, baselineCount }
           : { reply: "Search is temporarily unavailable. Please try again.", suggested: suggestFollowups(wantPersonal) },
@@ -269,7 +293,7 @@ export async function onRequestPost({ request, env }) {
       };
     });
 
-    return Response.json({
+    return corsJson({
       ok: true,
       step: "debug",
       wantPersonal,
@@ -288,7 +312,7 @@ export async function onRequestPost({ request, env }) {
 
   // 4) Ambiguous "about yourself" -> default professional
   if (ambiguousSelf && !wantPersonal) {
-    return Response.json({
+    return corsJson({
       reply: "I'm DevSecure's AI Concierge - I can help with AppSec questions, platform features, pricing, or booking a demo.",
       suggested: suggestFollowups(false),
     });
@@ -307,7 +331,7 @@ export async function onRequestPost({ request, env }) {
 
   // 6) System prompt — DEVSECURE B2B SAAS CONCIERGE
 const system = `
-LANGUAGE: Respond in English only, regardless of the language the user writes in.
+LANGUAGE: You are a multilingual assistant. You MUST automatically detect the language of the user's input and reply in that EXACT same language. If they ask a question in Spanish, French, German, etc., translate your knowledge and reply natively in that language, even if your internal RAG context is in English.
 
 ROLE
 You are the DevSecure AI Concierge, a customer support and technical sales agent for an Application Security SaaS company. You do not represent an individual. Be professional, concise, and helpful.
@@ -398,7 +422,7 @@ Respond with a valid JSON object containing at minimum a "reply" string.
     ? (rawReplyText || '').trim()
     : capReply(rawReplyText, HARD_CHAR_CAP);
 
-  return Response.json({
+  return corsJson({
     reply,
     suggested: buildSuggestedFromReply(reply, wantPersonal, message),
     action,
