@@ -1,5 +1,6 @@
 // Author: Jeremy Quadri
 import { useState, useEffect, useRef, useMemo } from 'react'
+import ReactMarkdown from 'react-markdown'
 import mermaid from 'mermaid'
 import { MessageSquare, Send, X, Sparkles, Shield } from 'lucide-react'
 
@@ -74,6 +75,26 @@ function parseContent(content: string): ContentPart[] {
     return parts
 }
 
+// Converts Markdown inline links ([label](url)) to <a> elements.
+// Non-link text segments are returned as plain strings inside <React.Fragment>.
+// Shared react-markdown component overrides for all chat bubble renders.
+// - `a`: opens in new tab securely, styled in Midnight Luxe champagne accent.
+// - `p`: rendered as a fragment to stay inline inside the parent <span> container.
+const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['components'] = {
+    a: ({ href, children, ...props }) => (
+        <a
+            {...props}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#C9A84C] underline underline-offset-2 hover:text-[#F4E8D1] transition-colors"
+        >
+            {children}
+        </a>
+    ),
+    p: ({ children }) => <>{children}</>,
+}
+
 // --- ARCHITECTURE DIAGRAM (DevSecure themed) ---
 const ArchitectureDiagram = () => (
     <div className="w-full mt-3 bg-[#111111]/60 backdrop-blur-md border border-[#F4E8D1]/10 rounded-2xl p-6 flex flex-col items-center justify-center min-h-[200px] shadow-inner">
@@ -114,9 +135,13 @@ const TypewriterText = ({ text }: { text: string }) => {
 
     return (
         <span className="whitespace-pre-wrap leading-relaxed tracking-wide">
-            {displayedText}
-            {isTyping && (
-                <span className="inline-block w-[2px] h-[1.1em] ml-1 bg-[#F4E8D1] animate-pulse align-middle opacity-80" />
+            {isTyping ? (
+                <>
+                    {displayedText}
+                    <span className="inline-block w-[2px] h-[1.1em] ml-1 bg-[#F4E8D1] animate-pulse align-middle opacity-80" />
+                </>
+            ) : (
+                <ReactMarkdown components={MD_COMPONENTS}>{text}</ReactMarkdown>
             )}
         </span>
     )
@@ -489,19 +514,19 @@ const AIConcierge = ({ inline = false }: Props) => {
                                         if (parts.length === 1 && parts[0].type === 'text') {
                                             return msg.isNew
                                                 ? <TypewriterText text={parts[0].text} />
-                                                : <span className="whitespace-pre-wrap leading-relaxed tracking-wide">{parts[0].text}</span>
+                                                : <span className="whitespace-pre-wrap leading-relaxed tracking-wide"><ReactMarkdown components={MD_COMPONENTS}>{parts[0].text}</ReactMarkdown></span>
                                         }
                                         return (
                                             <>
                                                 {parts.map((part, i) =>
                                                     part.type === 'mermaid'
                                                         ? <MermaidRenderer key={i} chart={part.chart} />
-                                                        : <span key={i} className="whitespace-pre-wrap leading-relaxed tracking-wide">{part.text}</span>
+                                                        : <span key={i} className="whitespace-pre-wrap leading-relaxed tracking-wide"><ReactMarkdown components={MD_COMPONENTS}>{part.text}</ReactMarkdown></span>
                                                 )}
                                             </>
                                         )
                                     })() : (
-                                        <span className="whitespace-pre-wrap leading-relaxed tracking-wide">{msg.content}</span>
+                                        <span className="whitespace-pre-wrap leading-relaxed tracking-wide"><ReactMarkdown components={MD_COMPONENTS}>{msg.content || ''}</ReactMarkdown></span>
                                     )}
                                 </div>
 

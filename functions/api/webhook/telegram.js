@@ -55,7 +55,7 @@ export async function onRequestPost({ request, env }) {
   const tgChatId = env[`TG_CHAT_ID_${tenantId.toUpperCase()}`] || env.TELEGRAM_CHAT_ID;
 
   // --- HANDOFF EXIT ---
-  if (/^(done|exit)$/i.test(message.text.trim())) {
+  if (/^(done|exit|end|bye)$/i.test(message.text.trim())) {
     const activeSession = env.CHAT_STATE ? await env.CHAT_STATE.get(KV_SESSION) : null;
     if (activeSession && env.CHAT_STATE) {
       await env.CHAT_STATE.put(`tenant:${tenantId}:reply:${activeSession}:${Date.now()}`, '__RELEASE_AI__', { expirationTtl: 86400 });
