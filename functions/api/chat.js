@@ -334,7 +334,7 @@ RESOURCE MAP (IMMUTABLE LINKS)
 - Book a Demo / Schedule a Meeting / Talk to Sales: https://calendar.app.google/8cPb8oBThkN1g3zq5
 
 CALENDAR RULE (MANDATORY)
-- If the user asks to schedule a meeting, book a demo, or talk to sales, you MUST provide this exact calendar link in your response: https://calendar.app.google/8cPb8oBThkN1g3zq5
+- If the user asks to schedule a meeting, book a demo, or talk to sales, you MUST provide this exact calendar link formatted strictly as a clickable Markdown link, like this: [Book a Demo with DevSecure](https://calendar.app.google/8cPb8oBThkN1g3zq5). NEVER output the raw URL as plain text.
 - Never substitute, shorten, or paraphrase this URL.
 
 JSON OUTPUT CONTRACT
