@@ -50,31 +50,55 @@ export async function onRequestPost({ request, env }) {
     const tunnelOpen = (liveSession === uuid) || (handoffActive === uuid);
 
     if (tunnelOpen) {
-      // Re-establish session keys if cleared by a prior done/exit but handoff_active still valid
-      if (liveSession !== uuid) {
-        await env.CHAT_STATE.put(KV_SESSION, uuid, { expirationTtl: 86400 }).catch(() => {});
+      const isExitCommand = /^(done|exit|end|bye)$/i.test(message.trim());
+
+      if (isExitCommand) {
+        // Visitor ended the handoff — release KV and notify the Telegram agent
+        await env.CHAT_STATE.delete(KV_HANDOFF).catch(() => {});
+        await env.CHAT_STATE.delete(KV_SESSION).catch(() => {});
+        await env.CHAT_STATE.delete(KV_SESSION_TS).catch(() => {});
+        if (env.TELEGRAM_BOT_TOKEN && tgChatId) {
+          await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: tgChatId,
+              text: `🛑 Visitor ended the conversation ("${message}"). AI is back in control. [Tenant: ${tenantId}] [Session: ${uuid}]`,
+            }),
+          }).catch(e => console.error('[chat] EXIT_NOTIFY_ERROR', e?.message));
+        }
+        console.log('[chat] TWO_WAY_BRIDGE visitor exit, tunnel released for session', uuid);
+        // Fall through to AI so it delivers a contextual goodbye reply
+      } else {
+        // Normal handoff: re-establish session keys if needed, forward to Telegram, return early
+        if (liveSession !== uuid) {
+          await env.CHAT_STATE.put(KV_SESSION, uuid, { expirationTtl: 86400 }).catch(() => {});
+          await env.CHAT_STATE.put(KV_SESSION_TS, Date.now().toString(), { expirationTtl: 86400 }).catch(() => {});
+          console.log('[chat] TWO_WAY_BRIDGE re-established session from handoff_active', uuid);
+        }
+        const tgText = `💬 Visitor: "${message}"\n\n[Tenant: ${tenantId}] [Session: ${uuid}]`;
+        if (env.TELEGRAM_BOT_TOKEN && tgChatId) {
+          await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ chat_id: tgChatId, text: tgText }),
+          }).catch(e => console.error('[chat] BRIDGE_SEND_ERROR', e?.message));
+        }
+        // Refresh timestamp so auto-timeout resets on each visitor message
         await env.CHAT_STATE.put(KV_SESSION_TS, Date.now().toString(), { expirationTtl: 86400 }).catch(() => {});
-        console.log('[chat] TWO_WAY_BRIDGE re-established session from handoff_active', uuid);
+        console.log('[chat] TWO_WAY_BRIDGE forwarded to Telegram for session', uuid);
+        return Response.json({ reply: null, action: 'wait_for_agent', suggested: [] });
       }
-      const tgText = `💬 Visitor: "${message}"\n\n[Tenant: ${tenantId}] [Session: ${uuid}]`;
-      if (env.TELEGRAM_BOT_TOKEN && tgChatId) {
-        await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ chat_id: tgChatId, text: tgText }),
-        }).catch(e => console.error('[chat] BRIDGE_SEND_ERROR', e?.message));
-      }
-      // Refresh timestamp so auto-timeout resets on each visitor message
-      await env.CHAT_STATE.put(KV_SESSION_TS, Date.now().toString(), { expirationTtl: 86400 }).catch(() => {});
-      console.log('[chat] TWO_WAY_BRIDGE forwarded to Telegram for session', uuid);
-      return Response.json({ reply: null, action: 'wait_for_agent', suggested: [] });
     }
   }
   // --- END TWO-WAY BRIDGE ---
 
   // --- PRE-AI TELEGRAM INTERCEPTOR ---
-  const INTERCEPT_RE = /\b(waf|quote|contract|rate|rates|pricing)\b/i;
-  if (INTERCEPT_RE.test(message)) {
+  // Calendar-intent guard: if the message is primarily about booking/scheduling,
+  // let the AI handle it (it will provide the calendar link) rather than escalating.
+  const INTERCEPT_RE      = /\b(waf|quote|contract|rate|rates|pricing)\b/i;
+  const CALENDAR_INTENT_RE = /\b(meeting|demo|schedule|calendar|book)\b/i;
+  if (INTERCEPT_RE.test(message) && !CALENDAR_INTENT_RE.test(message)) {
     const tgText = `🔔 High-value inquiry [Tenant: ${tenantId}] [Session: ${uuid}]\n\n"${message}"\n\n↩ Reply to this message to respond in the visitor's chat.`;
     if (env.TELEGRAM_BOT_TOKEN && tgChatId) {
       try {
