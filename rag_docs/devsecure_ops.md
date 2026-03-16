@@ -1,307 +1,388 @@
+# DevSecure Knowledge Base (RAG Source)
 
-# DevSecure FAQ and User Guide
-
-## Platform Overview
-
-### What is DevSecure?
-DevSecure is an all‑in‑one Application Security Posture Management (ASPM) platform designed for modern development teams. It helps organizations detect, prioritize, and remediate security vulnerabilities across the entire software development lifecycle.
-
-The platform combines multiple security capabilities in a unified environment including:
-
-- Static Application Security Testing (SAST)
-- Software Composition Analysis (SCA)
-- Dynamic Application Security Testing (DAST)
-- Secrets Detection
-- Infrastructure‑as‑Code (IaC) scanning
-- SBOM generation
-- Malware detection
-- Mobile application scanning
-- WordPress security analysis
-
-DevSecure integrates directly with developer workflows, CI/CD pipelines, and version control platforms.
-
----
 
 ## Getting Started
 
+### What is DevSecure?
+DevSecure is an Application Security Posture Management (ASPM) platform that helps development teams detect, prioritize, and remediate vulnerabilities across code, dependencies, infrastructure, and running applications. It integrates directly with developer workflows, CI/CD pipelines, and repository platforms.
+
+### What problems does DevSecure solve?
+DevSecure centralizes multiple security tools into a single platform so teams can detect vulnerabilities earlier, reduce security tool sprawl, and remediate issues faster without interrupting development workflows.
+
+### Who typically uses DevSecure?
+DevSecure is used by developers, security engineers, DevOps teams, and platform engineers who want to embed security checks directly into their development pipelines.
+
 ### How do I create a DevSecure account?
-To start using DevSecure:
+Sign up through the DevSecure platform, verify your email address, create or join a workspace, and connect your repositories to begin scanning.
 
-1. Sign up through the DevSecure dashboard.
-2. Verify your email address.
-3. Create or join a workspace.
-4. Connect your source code repositories.
-5. Configure scanning policies and integrations.
+### What is a workspace in DevSecure?
+A workspace represents an isolated environment for an organization or team where repositories, scans, security policies, and users are managed.
 
-Once your repositories are connected, DevSecure automatically begins scanning your projects.
+### How do I invite team members?
+Workspace administrators can invite members from the workspace settings page and assign appropriate roles such as administrator, developer, or security reviewer.
 
----
+### How long does setup take?
+Most teams can connect their repositories and begin receiving security findings within minutes after authorizing repository access.
 
-### What is a workspace?
-A workspace represents a secure environment for your organization within DevSecure. It allows teams to:
+### Do I need to install an agent?
+No agent is required. DevSecure connects directly to your repository providers and CI/CD pipelines.
 
-- Manage repositories
-- Configure security policies
-- Invite team members
-- View vulnerability dashboards
-- Manage integrations and scanning settings
+### What programming languages are supported?
+DevSecure supports multiple languages commonly used in modern development including JavaScript, Python, Go, Java, and others.
 
-Workspaces help separate environments for different teams or organizations.
+### Can DevSecure scan private repositories?
+Yes. Once authorized, DevSecure can scan private repositories securely using read-only repository access.
 
----
 
 ## Repository Integration
 
-### Which version control systems are supported?
-DevSecure integrates with major Git platforms including:
-
-- GitHub
-- GitLab
-- Bitbucket
-- Azure DevOps
-
-Connecting repositories allows DevSecure to automatically scan code during development.
-
----
+### Which repository platforms are supported?
+DevSecure integrates with major Git platforms including GitHub, GitLab, Bitbucket, and Azure DevOps.
 
 ### How do I connect a repository?
-To connect a repository:
+Authorize DevSecure to access your repository provider and select the repositories you want scanned.
 
-1. Open **Integrations** in the DevSecure dashboard.
-2. Select your Git provider.
-3. Authorize DevSecure to access repositories.
-4. Choose the repositories you want scanned.
+### What happens after connecting a repository?
+DevSecure indexes the repository and begins scanning code, dependencies, secrets, and infrastructure definitions.
 
-DevSecure will begin indexing and scanning code immediately.
+### Does DevSecure scan pull requests automatically?
+Yes. Pull requests are scanned automatically to detect new vulnerabilities before code is merged.
 
----
+### Can DevSecure scan multiple repositories?
+Yes. Workspaces can connect and monitor multiple repositories simultaneously.
 
-## Code Scanning
+### Does DevSecure support monorepos?
+Yes. DevSecure can scan monolithic repositories containing multiple services or applications.
 
-### What does DevSecure code scanning detect?
-DevSecure analyzes source code to detect:
+### What permissions does DevSecure require?
+DevSecure requires access to repository metadata and code to perform security analysis.
 
-- Injection vulnerabilities
-- Unsafe deserialization
-- Broken authentication patterns
-- Insecure cryptographic usage
-- Hardcoded credentials
-- Dependency vulnerabilities
-- Misconfigured infrastructure definitions
+### Can I disconnect a repository?
+Yes. Administrators can remove repositories from the workspace at any time.
 
-Scanning occurs both during repository analysis and during pull requests.
+### How often are repositories scanned?
+Repositories are scanned whenever code changes occur, such as commits or pull requests.
 
----
+### Can DevSecure scan forks?
+Yes, as long as the fork is part of the connected repository environment.
 
-### Can DevSecure scan code locally?
-Yes. Developers can run DevSecure scans locally before pushing code to remote repositories.
 
-Local scanning helps developers:
+## SAST
 
-- catch vulnerabilities early
-- prevent secrets from entering commits
-- validate fixes before creating pull requests
+### What does DevSecure static code scanning detect?
+DevSecure analyzes source code to detect vulnerabilities such as injection flaws, insecure cryptography usage, authentication issues, and unsafe data handling.
 
----
+### How does static analysis work?
+Static analysis examines the source code without executing the program, identifying risky patterns and insecure constructs.
 
-### Does DevSecure scan pull requests?
-Yes. DevSecure automatically scans pull requests and code changes.
+### Does DevSecure detect OWASP Top 10 vulnerabilities?
+Yes. DevSecure detects many common vulnerabilities listed in the OWASP Top 10.
 
-This enables teams to:
+### Can DevSecure analyze pull request changes only?
+Yes. Pull request scanning focuses on the modified code so developers can fix issues early.
 
-- detect vulnerabilities before merging
-- block insecure changes
-- receive remediation guidance within the development workflow
+### Can developers run scans locally?
+Yes. Developers can run local scans before committing code to detect vulnerabilities earlier.
 
----
+### Why was my code flagged as vulnerable?
+The scan detected patterns that match known insecure coding practices or vulnerability signatures.
 
-## Secrets Detection
+### How do I fix a SAST finding?
+Review the remediation guidance provided by DevSecure and update the affected code accordingly.
+
+### Can SAST detect unreachable vulnerabilities?
+DevSecure highlights findings and may indicate if the code path appears reachable or risky.
+
+### Does static analysis slow down builds?
+DevSecure is optimized to run efficiently alongside development workflows.
+
+### Can DevSecure analyze infrastructure definitions in code?
+Yes. Infrastructure-as-Code files can also be scanned for misconfigurations.
+
+
+## Secrets
 
 ### What is secret detection?
-Secret detection identifies exposed credentials in code repositories.
+Secret detection identifies exposed credentials such as API keys, tokens, and passwords in source code.
 
-Examples include:
+### Which secrets can be detected?
+Examples include cloud access keys, API tokens, database passwords, and cryptographic keys.
 
-- API keys
-- database passwords
-- cloud access tokens
-- private cryptographic keys
-- authentication tokens
-
-DevSecure scans repositories continuously to detect leaked secrets.
-
----
+### How often are repositories scanned for secrets?
+Repositories are scanned continuously when code changes occur.
 
 ### What should I do if a secret is detected?
-If a secret is detected:
+Immediately revoke the secret, remove it from the codebase, and rotate the credential.
 
-1. Revoke or rotate the credential immediately.
-2. Remove the secret from the codebase.
-3. Replace it with secure environment variables or secret management systems.
-4. Commit the fix and rerun the scan.
+### Can DevSecure prevent secrets from being committed?
+Developers can run local scans before commits to prevent secrets from entering the repository.
 
----
+### Does DevSecure detect secrets in pull requests?
+Yes. Pull request scanning includes secret detection.
 
-## Autonomous Remediation
+### What happens after a secret is detected?
+The platform alerts the team and highlights the file location containing the secret.
 
-### What is automated vulnerability remediation?
-DevSecure can automatically generate code patches to fix detected vulnerabilities.
+### Can secrets be removed from scan history?
+Once removed from the codebase and rescanned, the issue can be marked resolved.
 
-The system uses a multi‑stage validation process:
+### Does DevSecure scan commit history?
+Some scans may detect secrets in historical commits if they remain present.
 
-1. AI generates a remediation patch.
-2. The patch is reviewed by automated security checks.
-3. Deterministic validation gates verify safety.
-4. Only safe fixes are proposed to developers.
+### How can teams prevent secret leaks?
+Use secret managers, environment variables, and avoid hardcoding credentials.
 
-This ensures automated patches remain safe and reliable.
 
----
+## SCA
 
-### How are automated fixes delivered?
-Fixes can be delivered through:
+### What is Software Composition Analysis?
+SCA analyzes open-source dependencies to identify known vulnerabilities.
 
-- Pull requests with suggested patches
-- Inline remediation guidance
-- Developer workflow notifications
+### Which files are analyzed for dependencies?
+Common dependency files include package.json, requirements.txt, pom.xml, and go.mod.
 
-Developers can review and approve fixes before merging.
+### How does DevSecure detect vulnerable libraries?
+It compares dependency versions against vulnerability databases.
 
----
+### Can DevSecure suggest safe upgrades?
+Yes. DevSecure recommends dependency versions that resolve vulnerabilities.
 
-## Dynamic Application Security Testing
+### Can DevSecure create upgrade pull requests?
+The platform can generate remediation guidance or automated PRs for some upgrades.
 
-### What is runtime security testing?
-Runtime testing analyzes live applications and services.
+### What if a dependency cannot be upgraded?
+Developers may apply mitigations or alternative libraries.
 
-This allows DevSecure to detect:
+### Does DevSecure track transitive dependencies?
+Yes. Indirect dependencies are also analyzed.
 
-- exposed endpoints
-- insecure API configurations
-- authentication flaws
-- injection vulnerabilities in running applications
+### How are dependency risks prioritized?
+Risk scoring considers severity, exploitability, and application exposure.
 
-Runtime scanning complements static code analysis.
+### Can DevSecure analyze container images?
+If container dependencies are included in manifests they may be analyzed.
 
----
+### How often are vulnerability databases updated?
+Security intelligence sources are updated regularly to track newly disclosed issues.
+
+
+## DAST
+
+### What is dynamic application security testing?
+DAST analyzes running applications to detect vulnerabilities during execution.
+
+### How does runtime scanning work?
+The scanner sends requests to application endpoints to identify vulnerabilities.
+
+### What vulnerabilities can DAST detect?
+Common findings include injection vulnerabilities, misconfigurations, and exposed endpoints.
 
 ### Can DevSecure scan APIs?
-Yes. DevSecure supports API scanning for REST and web APIs.
+Yes. API endpoints can be scanned to detect authentication or data exposure issues.
 
-The platform can test:
+### Does DevSecure scan staging environments?
+Yes. Teams can configure scanning targets for staging or testing environments.
 
-- authentication flows
-- request validation
-- API authorization issues
-- insecure data exposure
+### Can authenticated scans be performed?
+Applications can be scanned with authentication workflows when configured.
 
----
+### What is attack surface monitoring?
+It identifies externally exposed services and endpoints.
 
-## Dependency and Supply Chain Security
+### Can DevSecure detect exposed APIs?
+Yes. Surface monitoring helps detect exposed services.
 
-### What is software composition analysis?
-Software Composition Analysis (SCA) detects vulnerabilities in open‑source dependencies.
+### Does DAST replace SAST?
+No. Both approaches complement each other.
 
-DevSecure analyzes dependency manifests such as:
+### How are runtime findings verified?
+Findings include reproduction details for developers.
 
-- package.json
-- requirements.txt
-- pom.xml
-- go.mod
 
-It identifies vulnerable components and suggests safe upgrade paths.
+## Remediation
 
----
+### What is autonomous remediation?
+DevSecure can propose patches that fix detected vulnerabilities automatically.
+
+### How are automated patches validated?
+Generated fixes pass through validation checks and deterministic gates.
+
+### What happens if a patch fails validation?
+Developers are notified and must manually review or adjust the fix.
+
+### How are fixes delivered?
+Automated fixes can appear as pull requests or inline suggestions.
+
+### Can developers review fixes before merging?
+Yes. All patches should be reviewed before merging.
+
+### Are automated fixes always available?
+Not all vulnerabilities support automated remediation.
+
+### How does DevSecure ensure safe fixes?
+Validation gates check compilation, tests, and security rules.
+
+### What if an automated fix conflicts with existing code?
+Developers may need to resolve conflicts manually.
+
+### Can remediation suggestions be customized?
+Security policies may influence remediation workflows.
+
+### How quickly can vulnerabilities be fixed?
+With automation, many fixes can be applied quickly after detection.
+
+
+## SBOM
 
 ### What is an SBOM?
-An SBOM (Software Bill of Materials) is a list of all components used within an application.
+An SBOM lists all components and dependencies used in an application.
 
-DevSecure generates SBOM reports that help organizations:
+### Why is an SBOM important?
+It helps organizations understand supply chain risk.
 
-- understand software dependencies
-- manage supply chain risk
-- comply with security regulations
+### Can DevSecure generate SBOM reports?
+Yes. SBOM generation is supported.
 
----
+### What formats can SBOMs use?
+Common formats include CycloneDX and SPDX.
 
-## Infrastructure Security
+### Can SBOMs help with compliance?
+Yes. They support regulatory and security requirements.
 
-### What is Infrastructure‑as‑Code scanning?
-DevSecure analyzes infrastructure configuration files to detect security misconfigurations.
+### Does the SBOM include transitive dependencies?
+Yes. Nested dependencies may be included.
 
-Supported formats include:
+### How often should SBOMs be generated?
+Typically during builds or major releases.
 
-- Terraform
-- Kubernetes manifests
-- cloud configuration templates
+### Can SBOMs identify vulnerable components?
+Yes. SBOMs can be cross-referenced with vulnerability databases.
 
-Common findings include:
+### Who uses SBOM reports?
+Security teams, compliance teams, and developers.
 
-- exposed storage buckets
-- overly permissive access policies
-- insecure network configurations
+### Where can I export the SBOM?
+The DevSecure dashboard allows exporting reports.
 
----
 
-## Security Dashboard
+## Dashboard
 
 ### Where can I view vulnerabilities?
-All detected vulnerabilities appear in the DevSecure dashboard.
+The DevSecure dashboard centralizes all detected vulnerabilities.
 
-The dashboard provides:
+### How are findings organized?
+Findings can be filtered by repository, severity, and type.
 
-- vulnerability severity levels
-- remediation guidance
-- affected repositories
-- security trends over time
+### Can I track vulnerability trends?
+Yes. The dashboard provides historical analytics.
 
-Teams can filter results by project, severity, or vulnerability type.
+### Can vulnerabilities be assigned to developers?
+Teams may assign findings for remediation.
 
----
+### How do I mark a vulnerability resolved?
+After fixing the issue, the next scan will confirm resolution.
 
-### How are vulnerabilities prioritized?
-DevSecure prioritizes vulnerabilities using risk‑based scoring that considers:
+### Can I filter findings by severity?
+Yes. Severity filters help prioritize work.
 
-- exploitability
-- known exploitation activity
-- dependency criticality
-- code reachability
+### Does the dashboard show remediation guidance?
+Each finding includes guidance and context.
 
-This helps teams focus on the most impactful security issues.
+### Can I export reports?
+Security reports can be exported for audits.
 
----
+### How does DevSecure prioritize issues?
+Prioritization considers severity, exploitability, and exposure.
 
-## Notifications and Alerts
+### Can security policies be configured?
+Organizations can define policies affecting scan behavior.
 
-### How will I be notified about vulnerabilities?
-DevSecure supports notifications through:
+### Operational Scenario 1
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
-- dashboard alerts
-- pull request comments
-- email notifications
-- CI/CD pipeline status checks
+### Operational Scenario 2
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
-This ensures vulnerabilities are surfaced directly in developer workflows.
+### Operational Scenario 3
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
----
+### Operational Scenario 4
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
-## Best Practices
+### Operational Scenario 5
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
-### Recommended workflow
+### Operational Scenario 6
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
-1. Connect repositories to DevSecure.
-2. Enable pull request scanning.
-3. Review vulnerabilities regularly.
-4. Apply automated remediation when available.
-5. Monitor dashboards for trends.
+### Operational Scenario 7
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
----
+### Operational Scenario 8
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
-### Security culture
+### Operational Scenario 9
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
-DevSecure works best when security is integrated into development workflows. Encourage teams to:
+### Operational Scenario 10
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
 
-- run scans early
-- review security alerts promptly
-- prioritize high‑risk vulnerabilities
-- maintain dependency hygiene
+### Operational Scenario 11
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 12
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 13
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 14
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 15
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 16
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 17
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 18
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 19
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 20
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 21
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 22
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 23
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 24
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 25
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 26
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 27
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 28
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 29
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
+
+### Operational Scenario 30
+Review the DevSecure dashboard findings, follow remediation guidance, and rerun the scan to confirm the issue is resolved.
