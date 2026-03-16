@@ -23,7 +23,7 @@ function corsJson(body, init = {}) {
   });
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, context }) {
   // Handle CORS preflight
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -44,6 +44,8 @@ export async function onRequestPost({ request, env }) {
   const KV_SESSION    = `tenant:${tenantId}:session`;
   const KV_SESSION_TS = `tenant:${tenantId}:session_ts`;
   const KV_HANDOFF    = `tenant:${tenantId}:handoff`;
+  // Persistent Context Memory key — 30-day rolling conversation window per user
+  const memoryKey = uuid ? `tenant:${tenantId}:user:${uuid}:memory` : null;
 
   // Resolve Telegram Chat ID — tenant-specific env var takes priority over global fallback.
   // e.g. TG_CHAT_ID_DEVSECURE, TG_CHAT_ID_ACME, etc.
@@ -119,8 +121,15 @@ export async function onRequestPost({ request, env }) {
   const userText           = (body?.message || '').toLowerCase();
   const INTERCEPT_RE       = /\b(waf|quote|contract|rate|rates|pricing)\b/i;
   const CALENDAR_INTENT_RE = /\b(meeting|demo|schedule|calendar|book)\b/i;
-  const wantsHuman = /\b(human|agent|person|representative|support)\b/.test(userText) &&
-                     !/\b(meeting|demo|schedule|calendar)\b/.test(userText);
+
+  // 1. Clear requests for a human, support agent, or phone contact
+  const requestsHuman = /(talk to|speak with|contact|get hold of).*(human|agent|person|representative|support)|live agent|real person|human representative|customer service|phone number|phone call|call me/i.test(userText);
+  // 2. Technical discussion of AI/software agents — must not trigger handoff
+  const isTechnical = /multi-agent|ai agent|software agent|support for|supported languages/i.test(userText);
+  // 3. Meeting/demo requests — handled by AI calendar link, not handoff
+  const isMeeting = /\b(meeting|demo|schedule|calendar)\b/i.test(userText);
+
+  const wantsHuman = requestsHuman && !isTechnical && !isMeeting;
 
   if ((INTERCEPT_RE.test(message) && !CALENDAR_INTENT_RE.test(message)) || wantsHuman) {
     const tgText = `🔔 High-value inquiry [Tenant: ${tenantId}] [Session: ${uuid}]\n\n"${message}"\n\n↩ Reply to this message to respond in the visitor's chat.`;
@@ -404,7 +413,12 @@ IMPORTANT: Be extremely brief. Answer in exactly ONE short sentence. If you incl
 Respond with a valid JSON object containing at minimum a "reply" string.
 `.trim();
 
-  const rawReply = await callOpenAI(env.OPENAI_API_KEY, system, user, debug);
+  // Fetch rolling conversation memory — injected between system prompt and current user turn
+  const pastMemory = (memoryKey && env.CHAT_STATE)
+    ? (await env.CHAT_STATE.get(memoryKey, 'json').catch(() => null)) || []
+    : [];
+
+  const rawReply = await callOpenAI(env.OPENAI_API_KEY, system, user, debug, pastMemory);
 
   // 7) Hard char cap — bypass when user explicitly wants detail
   let { reply: rawReplyText, action, codeSnippet } = rawReply;
@@ -422,6 +436,18 @@ Respond with a valid JSON object containing at minimum a "reply" string.
     ? (rawReplyText || '').trim()
     : capReply(rawReplyText, HARD_CHAR_CAP);
 
+  // Persist updated memory non-blockingly — 30-day TTL, 10-turn rolling window
+  if (memoryKey && env.CHAT_STATE && context?.waitUntil) {
+    const updatedMemory = [
+      ...pastMemory,
+      { role: 'user', content: message },
+      { role: 'assistant', content: reply },
+    ].slice(-10);
+    context.waitUntil(
+      env.CHAT_STATE.put(memoryKey, JSON.stringify(updatedMemory), { expirationTtl: 2592000 })
+    );
+  }
+
   return corsJson({
     reply,
     suggested: buildSuggestedFromReply(reply, wantPersonal, message),
@@ -437,11 +463,18 @@ function normalizeMatches(res) {
   return { matches: [] };
 }
 
-async function callOpenAI(apiKey, system, user, debugMode = false) {
+async function callOpenAI(apiKey, system, user, debugMode = false, pastMemory = []) {
   if (!apiKey) return { reply: "OpenAI API key missing on server." };
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
+
+  // Build messages array: system → past conversation turns → current user turn
+  const messages = [
+    { role: 'system', content: system },
+    ...pastMemory,
+    { role: 'user', content: user },
+  ];
 
   let resp;
   try {
@@ -454,10 +487,7 @@ async function callOpenAI(apiKey, system, user, debugMode = false) {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
+        messages,
         temperature: 0.2,
         max_tokens: 800,
         response_format: { type: "json_object" },
